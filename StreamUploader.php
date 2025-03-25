@@ -6,8 +6,8 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
  * 
  * @package S3Upload
  * @author jkjoy
- * @version 1.0.0
- * @date 2025-03-04
+ * @version 1.1.0
+ * @date 2025-03-25
  */
 class S3Upload_StreamUploader
 {
@@ -140,26 +140,18 @@ class S3Upload_StreamUploader
     private function saveLocalCopy($file, $path)
     {
         $uploadDir = __TYPECHO_ROOT_DIR__ . '/usr/uploads/';
-        
-        // 处理本地存储路径
-        if (!empty($this->options->customPath)) {
-            $customPath = trim($this->options->customPath, '/');
-            $localPath = $uploadDir . $customPath . '/' . $path;
-        } else {
-            $localPath = $uploadDir . $path;
-        }
-        
+        $localPath = $uploadDir . $path;
         $localDir = dirname($localPath);
-
+    
         if (!is_dir($localDir)) {
             mkdir($localDir, 0755, true);
         }
-
+    
         if (!copy($file['tmp_name'], $localPath)) {
             S3Upload_Utils::log("无法保存本地备份: " . $localPath, 'warning');
             return false;
         }
-
+    
         return true;
     }
 

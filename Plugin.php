@@ -11,7 +11,7 @@ use Utils\Helper;
  * 
  * @package S3Upload
  * @author jkjoy
- * @version 1.0.1
+ * @version 1.1.0
  * @link https://github.com/jkjoy
  * @dependence 1.2-*
  */
@@ -128,7 +128,7 @@ class S3Upload_Plugin implements PluginInterface
         // 高级设置
         $customPath = new \Typecho\Widget\Helper\Form\Element\Text(
             'customPath',
-            null,
+            '/',
             '',
             _t('自定义路径前缀'),
             _t('设置文件存储路径前缀，例如：uploads/（以/结尾）')

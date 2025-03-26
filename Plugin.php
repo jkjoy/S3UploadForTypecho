@@ -128,8 +128,8 @@ class S3Upload_Plugin implements PluginInterface
         // 高级设置
         $customPath = new \Typecho\Widget\Helper\Form\Element\Text(
             'customPath',
+            null,
             '/',
-            '',
             _t('自定义路径前缀'),
             _t('设置文件存储路径前缀，例如：uploads/（以/结尾）')
         );

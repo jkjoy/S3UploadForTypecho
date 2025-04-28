@@ -10,9 +10,9 @@ use Utils\Helper;
  * S3 协议上传插件
  * 
  * @package S3Upload
- * @author jkjoy
- * @version 1.1.0
- * @link https://github.com/jkjoy
+ * @author 老孙
+ * @version 1.2.0
+ * @link https://www.imsun.org
  * @dependence 1.2-*
  */
 class S3Upload_Plugin implements PluginInterface
@@ -158,6 +158,31 @@ class S3Upload_Plugin implements PluginInterface
             _t('路径形式：http(s)://endpoint/bucket/object<br/>虚拟主机形式：http(s)://bucket.endpoint/object')
         );
         $form->addInput($urlStyle);
+
+        // 图片压缩设置
+        $compressImages = new \Typecho\Widget\Helper\Form\Element\Radio(
+            'compressImages',
+            [
+                '1' => _t('启用'),
+                '0' => _t('禁用'),
+            ],
+            '0',
+            _t('图片压缩'),
+            _t('是否对上传的图片进行自动压缩')
+        );
+        $form->addInput($compressImages);
+
+        $compressQuality = new \Typecho\Widget\Helper\Form\Element\Text(
+            'compressQuality',
+            null,
+            '85',
+            _t('压缩质量'),
+            _t('图片压缩质量 (1-100)，数值越大质量越好但文件越大')
+        );
+        $compressQuality->addRule('isInteger', _t('请输入整数'));
+        $compressQuality->addRule('min', _t('请输入不小于1的数字'), 1);
+        $compressQuality->addRule('max', _t('请输入不大于100的数字'), 100);
+        $form->addInput($compressQuality);
     }
 
     /**

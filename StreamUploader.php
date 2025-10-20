@@ -18,7 +18,7 @@ class S3Upload_StreamUploader
     public function __construct()
     {
         $this->s3Client = S3Upload_S3Client::getInstance();
-        $this->options = Helper::options()->plugin('S3Upload');
+        $this->options = \Typecho\Widget::widget('Widget\Options')->plugin('S3Upload');
     }
 
     /**
@@ -30,23 +30,31 @@ class S3Upload_StreamUploader
     public function handleUpload($file)
     {
         try {
+            // 记录开始上传的详细信息
+            S3Upload_Utils::log("开始处理文件上传: " . print_r($file, true), 'debug');
+
             // 验证文件
             if (!$this->validateFile($file)) {
+                S3Upload_Utils::log("文件验证失败", 'error');
                 throw new Exception('文件验证失败');
             }
 
             // 生成基础存储路径（年月/文件名）
             $path = $this->s3Client->generatePath($file);
+            S3Upload_Utils::log("生成存储路径: {$path}", 'debug');
 
             // 构建完整的存储路径（包含自定义路径前缀）
             $fullPath = $path;
             if (!empty($this->options->customPath)) {
                 $customPath = trim($this->options->customPath, '/');
                 $fullPath = $customPath . '/' . $path;
+                S3Upload_Utils::log("完整存储路径: {$fullPath}", 'debug');
             }
 
             // 上传到S3
+            S3Upload_Utils::log("开始上传到S3: {$fullPath}", 'debug');
             $result = $this->s3Client->putObject($fullPath, $file['tmp_name']);
+            S3Upload_Utils::log("S3上传结果: " . print_r($result, true), 'debug');
 
             // 保存本地备份（如果需要）
             if ($this->shouldSaveLocal()) {
@@ -56,19 +64,25 @@ class S3Upload_StreamUploader
             // 使用S3Client获取正确的URL
             $url = $this->s3Client->getObjectUrl($path);
 
+            // 获取文件扩展名和MIME类型
+            $extension = $this->getFileExt($file['name']);
+            $mimeType = $this->getMimeType($file['tmp_name']);
+
             S3Upload_Utils::log("文件上传成功: 路径={$path}, URL={$url}");
 
             return array(
                 'name' => $file['name'],
                 'path' => $path,
                 'size' => $file['size'],
-                'type' => $this->getFileExt($file['name']),
-                'mime' => $this->getMimeType($file['tmp_name']),
+                'type' => $extension,
+                'mime' => $mimeType,
+                'extension' => $extension,
                 'url'  => $url
             );
 
         } catch (Exception $e) {
             S3Upload_Utils::log("上传失败: " . $e->getMessage(), 'error');
+            S3Upload_Utils::log("错误堆栈: " . $e->getTraceAsString(), 'error');
             throw new Exception('文件上传失败: ' . $e->getMessage());
         }
     }

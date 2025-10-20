@@ -19,7 +19,7 @@ class S3Upload_S3Client
      */
     private function __construct()
     {
-        $options = \Widget\Options::alloc();
+        $options = \Typecho\Widget::widget('Widget\Options');
         $this->options = $options->plugin('S3Upload');
         $this->endpoint = $this->options->endpoint;
         $this->bucket = $this->options->bucket;
@@ -44,21 +44,28 @@ class S3Upload_S3Client
      */
     public function putObject($path, $file)
     {
+        S3Upload_Utils::log("S3Client::putObject 开始 - 路径: {$path}", 'debug');
+
         $date = gmdate('Ymd\THis\Z');
         $shortDate = substr($date, 0, 8);
-        
+
         $payload = file_get_contents($file);
         if ($payload === false) {
+            S3Upload_Utils::log("无法读取文件: {$file}", 'error');
             throw new Exception('无法读取文件');
         }
 
+        S3Upload_Utils::log("文件读取成功，大小: " . strlen($payload) . " bytes", 'debug');
+
         $contentType = S3Upload_Utils::getMimeType($file);
         $contentSha256 = hash('sha256', $payload);
-        
+
         // 准备请求
         $canonical_uri = '/' . $this->bucket . '/' . ltrim($path, '/');
         $canonical_querystring = '';
-        
+
+        S3Upload_Utils::log("请求URI: {$canonical_uri}, Content-Type: {$contentType}", 'debug');
+
         // 准备请求头
         $headers = array(
             'content-length' => strlen($payload),
@@ -67,7 +74,7 @@ class S3Upload_S3Client
             'x-amz-content-sha256' => $contentSha256,
             'x-amz-date' => $date
         );
-        
+
         // 签名
         $signature = $this->getSignature(
             'PUT',
@@ -77,17 +84,19 @@ class S3Upload_S3Client
             $contentSha256,
             $shortDate
         );
-        
+
         // 准备 cURL 请求
         $ch = curl_init();
         $url = 'https://' . $this->endpoint . $canonical_uri;
-        
+
+        S3Upload_Utils::log("上传URL: {$url}", 'debug');
+
         $curlHeaders = array();
         foreach ($headers as $key => $value) {
             $curlHeaders[] = $key . ': ' . $value;
         }
         $curlHeaders[] = 'Authorization: ' . $signature;
-        
+
         curl_setopt_array($ch, array(
             CURLOPT_URL => $url,
             CURLOPT_HTTPHEADER => $curlHeaders,
@@ -97,15 +106,26 @@ class S3Upload_S3Client
             CURLOPT_SSL_VERIFYPEER => true,
             CURLOPT_HEADER => true
         ));
-        
+
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
-        
+
+        S3Upload_Utils::log("HTTP响应码: {$httpCode}", 'debug');
+
         if ($httpCode !== 200) {
-            throw new Exception('上传失败，HTTP状态码：' . $httpCode);
+            $errorMsg = "上传失败，HTTP状态码：{$httpCode}";
+            if ($curlError) {
+                $errorMsg .= "，cURL错误：{$curlError}";
+            }
+            $errorMsg .= "\n请求URL：{$url}\n响应：{$response}";
+            S3Upload_Utils::log($errorMsg, 'error');
+            throw new Exception($errorMsg);
         }
-        
+
+        S3Upload_Utils::log("上传成功", 'debug');
+
         return array(
             'path' => $path,
             'url' => $this->getObjectUrl($path)
@@ -256,13 +276,13 @@ class S3Upload_S3Client
     {
         $ext = pathinfo($file['name'], PATHINFO_EXTENSION);
         $ext = $ext ? strtolower($ext) : '';
-        
-        $date = new Typecho_Date();
+
+        $date = new \Typecho\Date();
         $path = $date->year . '/' . $date->month;
-        
+
         // 生成文件名
         $fileName = sprintf('%u', crc32(uniqid())) . ($ext ? '.' . $ext : '');
-        
+
         // 合并路径
         return $path . '/' . $fileName;
     }

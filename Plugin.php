@@ -3,17 +3,18 @@ if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 
 use Typecho\Plugin\PluginInterface;
 use Typecho\Widget\Helper\Form;
-use Widget\Options;
-use Utils\Helper;
+use Typecho\Widget\Options;
+use Typecho\Common;
+use Typecho\Widget\Helper\Layout;
 
 /**
  * S3 协议上传插件
  * 
  * @package S3Upload
  * @author 老孙
- * @version 1.2.0
+ * @version 1.3.0
  * @link https://www.imsun.org
- * @dependence 1.2-*
+ * @dependence 1.3-*
  */
 class S3Upload_Plugin implements PluginInterface
 {
@@ -25,11 +26,14 @@ class S3Upload_Plugin implements PluginInterface
         // 检查依赖
         self::checkDependencies();
         
+        // 注册钩子 - 使用新的Typecho 1.3.0方式
         \Typecho\Plugin::factory('Widget\Upload')->uploadHandle = ['S3Upload_FileHandler', 'uploadHandle'];
         \Typecho\Plugin::factory('Widget\Upload')->modifyHandle = ['S3Upload_FileHandler', 'modifyHandle'];
         \Typecho\Plugin::factory('Widget\Upload')->deleteHandle = ['S3Upload_FileHandler', 'deleteHandle'];
         \Typecho\Plugin::factory('Widget\Upload')->attachmentHandle = ['S3Upload_FileHandler', 'attachmentHandle'];
         \Typecho\Plugin::factory('Widget\Upload')->attachmentDataHandle = ['S3Upload_FileHandler', 'attachmentDataHandle'];
+        
+
         
         return _t('插件已经激活，请设置 S3 配置信息');
     }
@@ -42,6 +46,8 @@ class S3Upload_Plugin implements PluginInterface
         if (!extension_loaded('curl')) {
             throw new \Typecho\Plugin\Exception(_t('PHP cURL 扩展未安装'));
         }
+        
+
     }
 
     /**
@@ -94,7 +100,7 @@ class S3Upload_Plugin implements PluginInterface
         );
         $form->addInput($accessKey->addRule('required', _t('必须填写 Access Key')));
 
-        $secretKey = new \Typecho\Widget\Helper\Form\Element\Password(
+        $secretKey = new \Typecho\Widget\Helper\Form\Element\Text(
             'secretKey',
             null,
             '',
@@ -191,4 +197,6 @@ class S3Upload_Plugin implements PluginInterface
     public static function personalConfig(Form $form)
     {
     }
+
+
 }

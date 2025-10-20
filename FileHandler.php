@@ -2,8 +2,7 @@
 if (!defined('__TYPECHO_ROOT_DIR__')) exit;
 
 use Typecho\Widget\Helper\Form;
-use Utils\Helper;
-use Widget\Upload;
+use Typecho\Common;
 
 class S3Upload_FileHandler
 {
@@ -21,11 +20,13 @@ class S3Upload_FileHandler
 
             $ext = self::getSafeName($file['name']);
 
-            if (!Upload::checkFileType($ext)) {
+            // Typecho 1.3.0 文件类型检查
+            $allowedTypes = ['jpg', 'jpeg', 'gif', 'png', 'webp', 'bmp', 'mp4', 'avi', 'mov', 'wmv', 'flv', 'mp3', 'wav', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip', 'rar'];
+            if (!in_array(strtolower($ext), $allowedTypes)) {
                 return false;
             }
 
-            $options = Helper::options()->plugin('S3Upload');
+            $options = \Typecho\Widget::widget('Widget\Options')->plugin('S3Upload');
             $mime = $file['type'] ?? mime_content_type($file['tmp_name'] ?? '');
             $isImage = self::isImage($mime);
 
@@ -91,115 +92,127 @@ class S3Upload_FileHandler
         }
     }
 
-    public static function attachmentHandle(array $content)
+    public static function attachmentHandle($content)
     {
-        $options = Helper::options()->plugin('S3Upload');
-        $path = $content['attachment']->path ?? ($content['path'] ?? '');
+        // 支持 Typecho\Config 对象和数组两种类型
+        if ($content instanceof \Typecho\Config) {
+            $path = $content->path ?? '';
+        } else if (is_array($content)) {
+            $path = $content['attachment']->path ?? ($content['path'] ?? '');
+        } else {
+            return '';
+        }
+
         if (empty($path)) return '';
         $s3Client = S3Upload_S3Client::getInstance();
         return $s3Client->getObjectUrl($path);
     }
 
-    public static function attachmentDataHandle(array $content)
+    public static function attachmentDataHandle($content)
     {
-        return $content;
+        // 支持 Typecho\Config 对象和数组两种类型
+        if ($content instanceof \Typecho\Config) {
+            $path = $content->path ?? '';
+        } else if (is_array($content)) {
+            $path = $content['attachment']->path ?? ($content['path'] ?? '');
+        } else {
+            return '';
+        }
+
+        if (empty($path)) return '';
+        $s3Client = S3Upload_S3Client::getInstance();
+        return $s3Client->getObjectUrl($path);
     }
 
     public static function modifyHandle($content, $file)
     {
-        if (empty($file['name'])) return false;
-        $result = self::uploadHandle($file);
-        if ($result) {
-            self::deleteHandle($content);
-            return $result;
+        try {
+            $uploader = new S3Upload_StreamUploader();
+            return $uploader->handleUpload($file);
+        } catch (Exception $e) {
+            S3Upload_Utils::log("修改文件错误: " . $e->getMessage(), 'error');
+            return false;
         }
-        return false;
     }
 
     public static function deleteHandle($content)
     {
-        $path = $content['attachment']->path ?? ($content['path'] ?? '');
-        if (empty($path)) return false;
         try {
-            $client = S3Upload_S3Client::getInstance();
-            $client->deleteObject($path);
-
-            $localFile = __TYPECHO_ROOT_DIR__ . '/usr/uploads/' . $path;
-            if (file_exists($localFile)) {
-                @unlink($localFile);
+            $path = $content['attachment']->path ?? ($content['path'] ?? '');
+            if (empty($path)) return false;
+            
+            $s3Client = S3Upload_S3Client::getInstance();
+            $result = $s3Client->deleteObject($path);
+            
+            // 如果配置了本地备份，也删除本地文件
+            $options = \Typecho\Widget::widget('Widget\Options')->plugin('S3Upload');
+            if (isset($options->saveLocal) && $options->saveLocal == 'true') {
+                $localPath = dirname(__FILE__) . '/../../../' . $path;
+                if (file_exists($localPath)) {
+                    @unlink($localPath);
+                }
             }
-            return true;
+            
+            return $result;
         } catch (Exception $e) {
-            S3Upload_Utils::log("删除文件失败: " . $e->getMessage(), 'error');
+            S3Upload_Utils::log("删除文件错误: " . $e->getMessage(), 'error');
             return false;
         }
     }
 
     private static function getSafeName($name)
     {
-        $name = str_replace(array('"', '<', '>'), '', $name);
-        $name = str_replace('\\', '/', $name);
-        $name = false === strpos($name, '/') ? ('a' . $name) : str_replace('/', '/a', $name);
-        $info = pathinfo($name);
-        $name = substr($info['basename'], 1);
-        return isset($info['extension']) ? strtolower($info['extension']) : '';
+        $ext = pathinfo($name, PATHINFO_EXTENSION);
+        return $ext ? strtolower($ext) : '';
     }
 
     private static function isImage($mime)
     {
-        return in_array($mime, [
-            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/bmp', 'image/webp'
-        ]);
+        return strpos($mime, 'image/') === 0;
     }
 
-    /**
-     * 压缩并转为webp
-     * @param string $src 源图片
-     * @param string $dest 目标webp
-     * @param string $mime 源图片mime
-     * @param int $quality
-     * @return bool
-     */
     private static function convertToWebp($src, $dest, $mime, $quality = 85)
     {
-        if (!function_exists('imagewebp')) return false;
-        if (!file_exists($src)) return false;
+        if (!extension_loaded('gd')) {
+            return false;
+        }
+
+        $image = null;
         switch ($mime) {
             case 'image/jpeg':
                 $image = imagecreatefromjpeg($src);
                 break;
             case 'image/png':
                 $image = imagecreatefrompng($src);
-                // 透明背景处理
-                imagepalettetotruecolor($image);
-                imagealphablending($image, true);
-                imagesavealpha($image, true);
                 break;
             case 'image/gif':
                 $image = imagecreatefromgif($src);
                 break;
-            case 'image/bmp':
-                $image = imagecreatefrombmp($src);
-                break;
-            case 'image/webp':
-                $image = imagecreatefromwebp($src);
-                break;
             default:
                 return false;
         }
-        if (!$image) return false;
+
+        if (!$image) {
+            return false;
+        }
+
+        // 保持透明度
+        if ($mime === 'image/png' || $mime === 'image/gif') {
+            imagepalettetotruecolor($image);
+            imagealphablending($image, true);
+            imagesavealpha($image, true);
+        }
+
         $result = imagewebp($image, $dest, $quality);
         imagedestroy($image);
-        return $result && file_exists($dest);
+
+        return $result;
     }
 
-    /**
-     * 替换文件名扩展为webp
-     */
     private static function replaceExtToWebp($filename)
     {
         $info = pathinfo($filename);
-        $base = isset($info['filename']) ? $info['filename'] : (isset($info['basename']) ? $info['basename'] : $filename);
-        return $base . '.webp';
+        $dirname = isset($info['dirname']) && $info['dirname'] !== '.' ? $info['dirname'] . '/' : '';
+        return $dirname . $info['filename'] . '.webp';
     }
 }

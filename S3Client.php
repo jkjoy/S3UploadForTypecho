@@ -97,13 +97,18 @@ class S3Upload_S3Client
         }
         $curlHeaders[] = 'Authorization: ' . $signature;
 
+        // 获取SSL验证设置
+        $sslVerify = isset($this->options->sslVerify) && $this->options->sslVerify === 'true';
+        S3Upload_Utils::log("SSL验证设置: " . ($sslVerify ? '启用' : '禁用'), 'debug');
+
         curl_setopt_array($ch, array(
             CURLOPT_URL => $url,
             CURLOPT_HTTPHEADER => $curlHeaders,
             CURLOPT_CUSTOMREQUEST => 'PUT',
             CURLOPT_POSTFIELDS => $payload,
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYPEER => true,
+            CURLOPT_SSL_VERIFYPEER => $sslVerify,
+            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0,
             CURLOPT_HEADER => true
         ));
 
@@ -166,13 +171,17 @@ class S3Upload_S3Client
             $curlHeaders[] = $key . ': ' . $value;
         }
         $curlHeaders[] = 'Authorization: ' . $signature;
-        
+
+        // 获取SSL验证设置
+        $sslVerify = isset($this->options->sslVerify) && $this->options->sslVerify === 'true';
+
         curl_setopt_array($ch, array(
             CURLOPT_URL => $url,
             CURLOPT_HTTPHEADER => $curlHeaders,
             CURLOPT_CUSTOMREQUEST => 'DELETE',
             CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_SSL_VERIFYPEER => true
+            CURLOPT_SSL_VERIFYPEER => $sslVerify,
+            CURLOPT_SSL_VERIFYHOST => $sslVerify ? 2 : 0
         ));
         
         $response = curl_exec($ch);

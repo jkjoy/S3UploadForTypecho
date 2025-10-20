@@ -189,6 +189,19 @@ class S3Upload_Plugin implements PluginInterface
         $compressQuality->addRule('min', _t('请输入不小于1的数字'), 1);
         $compressQuality->addRule('max', _t('请输入不大于100的数字'), 100);
         $form->addInput($compressQuality);
+
+        // SSL证书验证设置
+        $sslVerify = new \Typecho\Widget\Helper\Form\Element\Radio(
+            'sslVerify',
+            [
+                'true' => _t('启用'),
+                'false' => _t('禁用'),
+            ],
+            'false',
+            _t('SSL证书验证'),
+            _t('是否验证S3服务器的SSL证书。如果上传失败且服务器SSL证书配置有问题，可以尝试禁用此选项')
+        );
+        $form->addInput($sslVerify);
     }
 
     /**

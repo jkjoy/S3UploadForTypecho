@@ -20,7 +20,7 @@ class S3Upload_Utils
     {
         $date = date('Y-m-d H:i:s');
         $logMessage = "[{$date}] [{$level}] {$message}\n";
-        
+
         $logDir = __TYPECHO_ROOT_DIR__ . '/usr/logs';
         if (!is_dir($logDir)) {
             mkdir($logDir, 0755, true);

@@ -18,11 +18,14 @@ class S3Upload_FileHandler
                 return false;
             }
 
+            // 先获取 options 对象
+            $totalOptions = \Typecho\Widget::widget('Widget\Options');
+            
             $ext = self::getSafeName($file['name']);
 
-            // Typecho 1.3.0 文件类型检查
-            $allowedTypes = ['jpg', 'jpeg', 'gif', 'png', 'webp', 'bmp', 'mp4', 'avi', 'mov', 'wmv', 'flv', 'mp3', 'wav', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip', 'rar'];
-            if (!in_array(strtolower($ext), $allowedTypes)) {
+            // 使用从全局配置中获取的 allowedAttachmentTypes
+            // 这才是 Typecho 的标准做法！
+            if (!in_array(strtolower($ext), $totalOptions->allowedAttachmentTypes)) {
                 return false;
             }
 

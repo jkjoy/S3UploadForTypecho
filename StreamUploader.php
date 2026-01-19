@@ -62,7 +62,7 @@ class S3Upload_StreamUploader
             }
 
             // 使用S3Client获取正确的URL
-            $url = $this->s3Client->getObjectUrl($path);
+            $url = $this->s3Client->getObjectUrl($fullPath);
 
             // 获取文件扩展名和MIME类型
             $extension = $this->getFileExt($file['name']);
@@ -72,7 +72,7 @@ class S3Upload_StreamUploader
 
             return array(
                 'name' => $file['name'],
-                'path' => $path,
+                'path' => $fullPath,
                 'size' => $file['size'],
                 'type' => $extension,
                 'mime' => $mimeType,

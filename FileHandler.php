@@ -20,9 +20,8 @@ class S3Upload_FileHandler
 
             $ext = self::getSafeName($file['name']);
 
-            // Typecho 1.3.0 文件类型检查
-            $allowedTypes = ['jpg', 'jpeg', 'gif', 'png', 'webp', 'bmp', 'mp4', 'avi', 'mov', 'wmv', 'flv', 'mp3', 'wav', 'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'zip', 'rar'];
-            if (!in_array(strtolower($ext), $allowedTypes)) {
+            // 使用 Typecho 后台「允许上传的文件类型」设置进行校验
+            if (!self::isAllowedFileType($ext)) {
                 return false;
             }
 
@@ -36,6 +35,7 @@ class S3Upload_FileHandler
             if (
                 $isImage &&
                 isset($options->compressImages) && $options->compressImages == '1' &&
+                self::isAllowedFileType('webp') &&
                 isset($file['tmp_name']) && is_file($file['tmp_name']) && filesize($file['tmp_name']) > self::MIN_COMPRESS_SIZE
             ) {
                 $quality = isset($options->compressQuality) ? (int)$options->compressQuality : 85;
@@ -164,6 +164,32 @@ class S3Upload_FileHandler
     {
         $ext = pathinfo($name, PATHINFO_EXTENSION);
         return $ext ? strtolower($ext) : '';
+    }
+
+    private static function isAllowedFileType(string $ext): bool
+    {
+        $ext = strtolower(trim($ext));
+        if ($ext === '') {
+            return false;
+        }
+
+        // Typecho 1.3+：Widget\Upload::checkFileType 使用 Options::allowedAttachmentTypes
+        if (class_exists('\\Widget\\Upload') && method_exists('\\Widget\\Upload', 'checkFileType')) {
+            return \Widget\Upload::checkFileType($ext);
+        }
+
+        // 兜底：直接读取全局配置的 allowedAttachmentTypes
+        try {
+            $options = \Typecho\Widget::widget('Widget\Options');
+            $allowed = $options->allowedAttachmentTypes ?? null;
+            if (is_array($allowed)) {
+                return in_array($ext, $allowed, true);
+            }
+        } catch (\Throwable $e) {
+            // ignore
+        }
+
+        return false;
     }
 
     private static function isImage($mime)

@@ -24,7 +24,7 @@ class S3Upload_Plugin implements PluginInterface
     public static function activate()
     {
         // 检查依赖
-        self::checkDependencies();
+        $warnings = self::checkDependencies();
         
         // 注册钩子 - 使用新的Typecho 1.3.0方式
         \Typecho\Plugin::factory('Widget\Upload')->uploadHandle = ['S3Upload_FileHandler', 'uploadHandle'];
@@ -35,7 +35,12 @@ class S3Upload_Plugin implements PluginInterface
         
 
         
-        return _t('插件已经激活，请设置 S3 配置信息');
+        $message = _t('插件已经激活，请设置 S3 配置信息');
+        if (!empty($warnings)) {
+            $message .= '<br/>' . implode('<br/>', $warnings);
+        }
+
+        return $message;
     }
 
     /**
@@ -44,10 +49,15 @@ class S3Upload_Plugin implements PluginInterface
     private static function checkDependencies()
     {
         if (!extension_loaded('curl')) {
-            throw new \Typecho\Plugin\Exception(_t('PHP cURL 扩展未安装'));
+            throw new \Typecho\Plugin\Exception(_t('PHP cURL 扩展未安装，插件无法上传文件，请先安装并启用 cURL 扩展'));
         }
-        
 
+        $warnings = [];
+        if (!extension_loaded('gd')) {
+            $warnings[] = _t('提醒：PHP GD 扩展未安装，图片压缩功能将不可用');
+        }
+
+        return $warnings;
     }
 
     /**

@@ -43,17 +43,9 @@ class S3Upload_StreamUploader
             $path = $this->s3Client->generatePath($file);
             S3Upload_Utils::log("生成存储路径: {$path}", 'debug');
 
-            // 构建完整的存储路径（包含自定义路径前缀）
-            $fullPath = $path;
-            if (!empty($this->options->customPath)) {
-                $customPath = trim($this->options->customPath, '/');
-                $fullPath = $customPath . '/' . $path;
-                S3Upload_Utils::log("完整存储路径: {$fullPath}", 'debug');
-            }
-
             // 上传到S3
-            S3Upload_Utils::log("开始上传到S3: {$fullPath}", 'debug');
-            $result = $this->s3Client->putObject($fullPath, $file['tmp_name']);
+            S3Upload_Utils::log("开始上传到S3: {$path}", 'debug');
+            $result = $this->s3Client->putObject($path, $file['tmp_name']);
             S3Upload_Utils::log("S3上传结果: " . print_r($result, true), 'debug');
 
             // 保存本地备份（如果需要）

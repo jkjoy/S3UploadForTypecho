@@ -48,7 +48,7 @@
 
 ## 安装方法
 
-1. 下载插件并解压到 `usr/plugins/S3Upload` 目录
+1. 下载插件并解压到 `usr/plugins/` 目录,并改为 `S3Upload`
 2. 在 Typecho 后台启用插件
 3. 配置 S3 相关参数
 

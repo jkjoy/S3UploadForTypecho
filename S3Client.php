@@ -61,7 +61,7 @@ class S3Upload_S3Client
         $contentSha256 = hash('sha256', $payload);
 
         // 准备请求
-        $canonical_uri = '/' . $this->bucket . '/' . ltrim($path, '/');
+        $canonical_uri = $this->buildCanonicalUri($path);
         $canonical_querystring = '';
 
         S3Upload_Utils::log("请求URI: {$canonical_uri}, Content-Type: {$contentType}", 'debug');
@@ -145,7 +145,7 @@ class S3Upload_S3Client
         $date = gmdate('Ymd\THis\Z');
         $shortDate = substr($date, 0, 8);
         
-        $canonical_uri = '/' . $this->bucket . '/' . ltrim($path, '/');
+        $canonical_uri = $this->buildCanonicalUri($path);
         $canonical_querystring = '';
         
         $headers = array(
@@ -246,36 +246,25 @@ class S3Upload_S3Client
     public function getObjectUrl($path)
     {
         $protocol = $this->options->useHttps === 'true' ? 'https://' : 'http://';
-        $path = ltrim($path, '/');
-        
-        // 处理自定义路径前缀
-        $customPath = !empty($this->options->customPath) ? trim($this->options->customPath, '/') : '';
+        $objectKey = $this->buildObjectKey($path);
+        if ($objectKey === '') {
+            return '';
+        }
         
         // 如果设置了自定义域名
         if (!empty($this->options->customDomain)) {
             $domain = rtrim($this->options->customDomain, '/');
-            
-            // 构建完整路径
-            if (!empty($customPath)) {
-                return $protocol . $domain . '/' . $customPath . '/' . $path;
-            }
-            
-            return $protocol . $domain . '/' . $path;
+
+            return $protocol . $domain . '/' . $objectKey;
         }
 
         // 没有自定义域名时，根据URL风格生成地址
         if ($this->options->urlStyle === 'virtual') {
-            if (!empty($customPath)) {
-                return $protocol . $this->bucket . '.' . $this->endpoint . '/' . $customPath . '/' . $path;
-            }
-            return $protocol . $this->bucket . '.' . $this->endpoint . '/' . $path;
+            return $protocol . $this->bucket . '.' . $this->endpoint . '/' . $objectKey;
         }
 
         // 路径形式
-        if (!empty($customPath)) {
-            return $protocol . $this->endpoint . '/' . $this->bucket . '/' . $customPath . '/' . $path;
-        }
-        return $protocol . $this->endpoint . '/' . $this->bucket . '/' . $path;
+        return $protocol . $this->endpoint . '/' . $this->bucket . '/' . $objectKey;
     }
 
     /**
@@ -294,5 +283,59 @@ class S3Upload_S3Client
 
         // 合并路径
         return $path . '/' . $fileName;
+    }
+
+    /**
+     * 构建对象 Key（自动拼接并规范化 customPath）
+     */
+    private function buildObjectKey($path)
+    {
+        $path = ltrim((string)$path, '/');
+        if ($path === '') {
+            return '';
+        }
+
+        // 兼容旧调用：如果 path 已经带了原始 customPath，则先剥离，避免重复拼接
+        $rawCustomPath = trim((string)$this->options->customPath, '/');
+        if ($rawCustomPath !== '') {
+            if ($path === $rawCustomPath) {
+                $path = '';
+            } elseif (strpos($path, $rawCustomPath . '/') === 0) {
+                $path = substr($path, strlen($rawCustomPath) + 1);
+            }
+        }
+
+        $customPath = $this->getNormalizedCustomPath();
+        if ($customPath === '') {
+            return $path;
+        }
+
+        if ($path === '') {
+            return $customPath;
+        }
+
+        if ($path === $customPath || strpos($path, $customPath . '/') === 0) {
+            return $path;
+        }
+
+        return $customPath . '/' . $path;
+    }
+
+    /**
+     * 构建 S3 Canonical URI
+     */
+    private function buildCanonicalUri($path)
+    {
+        $objectKey = $this->buildObjectKey($path);
+        return '/' . $this->bucket . '/' . ltrim($objectKey, '/');
+    }
+
+    /**
+     * 规范化 customPath
+     */
+    private function getNormalizedCustomPath()
+    {
+        $customPath = trim((string)$this->options->customPath, '/');
+        return trim($customPath, '/');
     }
 }

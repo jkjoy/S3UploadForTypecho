@@ -12,7 +12,7 @@ use Typecho\Widget\Helper\Layout;
  * 
  * @package S3Upload
  * @author 老孙
- * @version 1.3.2
+ * @version 1.3.3
  * @link https://www.imsun.org
  * @dependence 1.3-*
  */

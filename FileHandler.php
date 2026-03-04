@@ -94,14 +94,7 @@ class S3Upload_FileHandler
 
     public static function attachmentHandle($content)
     {
-        // 支持 Typecho\Config 对象和数组两种类型
-        if ($content instanceof \Typecho\Config) {
-            $path = $content->path ?? '';
-        } else if (is_array($content)) {
-            $path = $content['attachment']->path ?? ($content['path'] ?? '');
-        } else {
-            return '';
-        }
+        $path = self::extractPath($content);
 
         if (empty($path)) return '';
         $s3Client = S3Upload_S3Client::getInstance();
@@ -110,14 +103,7 @@ class S3Upload_FileHandler
 
     public static function attachmentDataHandle($content)
     {
-        // 支持 Typecho\Config 对象和数组两种类型
-        if ($content instanceof \Typecho\Config) {
-            $path = $content->path ?? '';
-        } else if (is_array($content)) {
-            $path = $content['attachment']->path ?? ($content['path'] ?? '');
-        } else {
-            return '';
-        }
+        $path = self::extractPath($content);
 
         if (empty($path)) return '';
         $s3Client = S3Upload_S3Client::getInstance();
@@ -138,7 +124,7 @@ class S3Upload_FileHandler
     public static function deleteHandle($content)
     {
         try {
-            $path = $content['attachment']->path ?? ($content['path'] ?? '');
+            $path = self::extractPath($content);
             if (empty($path)) return false;
             
             $s3Client = S3Upload_S3Client::getInstance();
@@ -147,7 +133,7 @@ class S3Upload_FileHandler
             // 如果配置了本地备份，也删除本地文件
             $options = \Typecho\Widget::widget('Widget\Options')->plugin('S3Upload');
             if (isset($options->saveLocal) && $options->saveLocal == 'true') {
-                $localPath = dirname(__FILE__) . '/../../../' . $path;
+                $localPath = __TYPECHO_ROOT_DIR__ . '/usr/uploads/' . ltrim((string)$path, '/');
                 if (file_exists($localPath)) {
                     @unlink($localPath);
                 }
@@ -240,5 +226,47 @@ class S3Upload_FileHandler
         $info = pathinfo($filename);
         $dirname = isset($info['dirname']) && $info['dirname'] !== '.' ? $info['dirname'] . '/' : '';
         return $dirname . $info['filename'] . '.webp';
+    }
+
+    /**
+     * 从 Typecho 传入的内容中提取附件路径
+     *
+     * @param mixed $content
+     * @return string
+     */
+    private static function extractPath($content)
+    {
+        // 1) 优先读取根级 path
+        if ($content instanceof \Typecho\Config || is_object($content)) {
+            $path = $content->path ?? '';
+            if (!empty($path)) {
+                return (string)$path;
+            }
+        } elseif (is_array($content)) {
+            $path = $content['path'] ?? '';
+            if (!empty($path)) {
+                return (string)$path;
+            }
+        } else {
+            return '';
+        }
+
+        // 2) 回退读取 attachment.path
+        $attachment = null;
+        if ($content instanceof \Typecho\Config || is_object($content)) {
+            $attachment = $content->attachment ?? null;
+        } elseif (is_array($content)) {
+            $attachment = $content['attachment'] ?? null;
+        }
+
+        if ($attachment instanceof \Typecho\Config || is_object($attachment)) {
+            return (string)($attachment->path ?? '');
+        }
+
+        if (is_array($attachment)) {
+            return (string)($attachment['path'] ?? '');
+        }
+
+        return '';
     }
 }
